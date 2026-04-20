@@ -24,6 +24,7 @@ func main() {
 	if region == "" {
 		region = "us-east-1"
 	}
+	pathPrefix := os.Getenv("PATH_PREFIX")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -56,13 +57,13 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	mux.HandleFunc("/", makeHandler(client, bucket, cacheMaxAge))
+	mux.HandleFunc("/", makeHandler(client, bucket, pathPrefix, cacheMaxAge))
 
 	log.Printf("listening on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
 
-func makeHandler(client *s3.Client, bucket, cacheMaxAge string) http.HandlerFunc {
+func makeHandler(client *s3.Client, bucket, pathPrefix, cacheMaxAge string) http.HandlerFunc {
 	cacheHeader := fmt.Sprintf("public, max-age=%s", cacheMaxAge)
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +73,9 @@ func makeHandler(client *s3.Client, bucket, cacheMaxAge string) http.HandlerFunc
 		}
 
 		key := strings.TrimPrefix(r.URL.Path, "/")
+		if pathPrefix != "" {
+			key = strings.TrimPrefix(key, strings.Trim(pathPrefix, "/")+"/")
+		}
 		if key == "" {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
